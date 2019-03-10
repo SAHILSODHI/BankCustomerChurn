@@ -116,6 +116,16 @@ y_pred = (y_pred > 0.5)
 cm_svc = confusion_matrix(y_test, y_pred)
 print (((cm_svc[0][0]+cm_svc[1][1])*100)/(cm_svc[0][0]+cm_svc[1][1]+cm_svc[0][1]+cm_svc[1][0]), '% of testing data was classified correctly by Support Vector Machine')
 
+# Applying Gaussian Naive Bayes
+from sklearn.naive_bayes import GaussianNB
+nb_classifier = GaussianNB()
+nb_classifier.fit(X_train, y_train)
+y_pred = nb_classifier.predict(X_test)
+y_pred = (y_pred > 0.5)
+
+cm_nb = confusion_matrix(y_test, y_pred)
+print (((cm_nb[0][0]+cm_nb[1][1])*100)/(cm_nb[0][0]+cm_nb[1][1]+cm_nb[0][1]+cm_nb[1][0]), '% of testing data was classified correctly by NaiveBayes')
+
 from sklearn.ensemble import RandomForestClassifier
 rf_classifier = RandomForestClassifier()
 rf_classifier.fit(X_train, y_train)
@@ -127,11 +137,20 @@ print (((cm_rf[0][0]+cm_rf[1][1])*100)/(cm_rf[0][0]+cm_rf[1][1]+cm_rf[0][1]+cm_r
 
 #XGBoost
 from xgboost import XGBClassifier
-xgb_classifier = XGBClassifier(gamma = 0.01,
-                               learning_rate = 0.1,
-                               max_depth = 7,
-                               min_child_weight = 5,
-                               n_estimators=20)
+xgb_classifier = XGBClassifier(gamma = 0.1,
+                               learning_rate = 0.4,
+                               max_depth = 5,
+                               min_child_weight = 6,
+                               n_estimators=80)
+
+# =============================================================================
+# parameters = [{'gamma': [0.1,0.2], 'min_child_weight':[6,7],'learning_rate':[0.4,0.5],'n_estimators':[70,80,90],
+#                'max_depth':[4,5,6]}]
+# grid_search = GridSearchCV(XGBClassifier(),parameters, cv=5, refit=True, verbose=0)
+# grid_search = grid_search.fit(X_train, y_train)
+# best_accuracy = grid_search.best_score_
+# best_parameters = grid_search.best_params_
+# =============================================================================
 
 xgb_classifier.fit(X_train, y_train)
 xg_pred = xgb_classifier.predict(X_test)
@@ -171,7 +190,7 @@ ann_classifier.compile(optimizer = 'adam', loss = 'binary_crossentropy', metrics
 
 # Fitting the ANN to the Training set.Epoch is the number of times we are 
 # training our ANN on the whole training set.
-ann_classifier.fit(X_train, y_train, batch_size = 10, nb_epoch = 1)
+ann_classifier.fit(X_train, y_train, batch_size = 10, nb_epoch = 95)
 
 # Making the Confusion Matrix
 cm_ann = confusion_matrix(y_test, y_pred)
@@ -232,31 +251,35 @@ plt.legend(loc="lower right")
 plt.show() 
 
 from sklearn import model_selection
-print('5-fold cross validation:\n')
+print('5-fold cross validation: (Before Voting_Classifier_Hard\n')
 
-labels = ['Logistic Regression', 'Random Forest']
+labels = ['Logistic Regression', 'Random Forests','Support Vector Machine',
+          'Extreme Gradient Boosting','Naive Bayes']
 
-for clf, label in zip([logistic_classifier, rf_classifier], labels):
+for clf, label in zip([logistic_classifier, rf_classifier,SVC_classifier,xgb_classifier,nb_classifier], labels):
 
-    scores = model_selection.cross_val_score(clf, X, y, 
+    scores = model_selection.cross_val_score(clf, X_train, y_train, 
                                               cv=5, 
                                               scoring='accuracy')
     print("Accuracy: %0.2f (+/- %0.2f) [%s]"
           % (scores.mean(), scores.std(), label))
 
 from sklearn.ensemble import VotingClassifier
-voting_clf_hard = VotingClassifier(estimators = [(labels[0], logistic_classifier),
-                                                 (labels[1], rf_classifier)],
+voting_clf_hard = VotingClassifier(estimators = [
+                                                 (labels[1], rf_classifier),
+                                                 (labels[3], xgb_classifier)
+                                                 ],
                                    voting = 'hard')
-voting_clf_soft = VotingClassifier(estimators = [(labels[0], logistic_classifier),
-                                                 (labels[1], rf_classifier)],
+voting_clf_soft = VotingClassifier(estimators = [
+                                                 (labels[1], rf_classifier),
+                                                 (labels[3], xgb_classifier)
+                                                 ],
                                    voting = 'soft')
 
-labels_new = ['Logistic Regression', 'Random Forest',
-              'Voting_Classifier_Hard', 'Voting_Classifier_Soft']
-
-for (clf, label) in zip([logistic_classifier, rf_classifier, voting_clf_hard,
-                        voting_clf_soft], labels_new):
+labels_new = ['Random Forest','Extreme Gradient Boosting','Voting_Classifier_Hard', 'Voting_Classifier_Soft']
+print('\n5-fold cross validation: (After Voting_Classifier_Hard\n')
+for (clf, label) in zip([rf_classifier,
+    xgb_classifier, voting_clf_hard, voting_clf_soft], labels_new):
     scores = model_selection.cross_val_score(clf, X, y, cv=5,
             scoring='accuracy')
     print("Accuracy: %0.2f (+/- %0.2f) [%s]"
